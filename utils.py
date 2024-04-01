@@ -14,16 +14,20 @@ def seed_everything(seed):
 def get_batch(dataLoader, args, batch_id, subseq_cnt):
     
     samples, sampleLen, val = dataLoader.batchLoader(batch_id, args.isTrain)
-    subseq_idx = subseq_cnt + args.max_subseq_len + 1
+    # subseq_idx = subseq_cnt + args.max_subseq_len
 
     max_bsk_list = []
     # max_seq = max([len(user_len) for user_len in sampleLen[subseq_cnt: args.max_subseq_len]])  # max length of sequence
-    max_seq = args.max_subseq_len + 1
+    max_seq = subseq_cnt + args.max_subseq_len
     for user_len in sampleLen:
-        if len(user_len[subseq_cnt: subseq_idx]) == 0:
+        if len(user_len[0: max_seq]) < max_seq:
             continue
-        max_bsk_list.append(max(user_len[subseq_cnt: subseq_idx]))
-    max_bsk = max(max_bsk_list)  # max length of basket
+        max_bsk_list.append(max(user_len[0: max_seq]))
+    if len(max_bsk_list) == 0:
+        max_bsk = 0
+    else:
+        max_bsk = max(max_bsk_list)  # max length of basket
+
     
     '''
     len(userLen)으로 유저의 seq 길이를 재고(몇개의 바구니를 소비했냐) 그걸 list로 만들어서 max를 해서 제일 긴 seq의 길이를 저장
@@ -35,7 +39,7 @@ def get_batch(dataLoader, args, batch_id, subseq_cnt):
     check = 0
     remove_user = []
 
-    batch_len = [user_len[subseq_cnt: subseq_idx] for user_len in sampleLen]
+    batch_len = [user_len[0: max_seq] for user_len in sampleLen]
 
     for user_idx, user in enumerate(samples):
         paddedU = []
@@ -53,7 +57,7 @@ def get_batch(dataLoader, args, batch_id, subseq_cnt):
         # else:
         #     repeatList.append(repeat_item)
 
-        user = user[subseq_cnt: subseq_idx]
+        user = user[0: max_seq]
         
         for eachBas in user:
             
@@ -72,6 +76,14 @@ def get_batch(dataLoader, args, batch_id, subseq_cnt):
     if len(remove_user) > 0:
         batch_len = [batch_len[i] for i in range(len(batch_len)) if i not in remove_user]
         batch_id = [batch_id[i] for i in range(len(batch_id)) if i not in remove_user]
+
+    del max_bsk_list
+    del samples
+    del sampleLen
+    del user
+    del paddedU
+    del remove_user
+    torch.cuda.empty_cache() 
 
     
     # pad_batch.shape == [배치크기, max_seq, max_bsk]

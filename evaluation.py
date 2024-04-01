@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import math
 from utils import get_batch
+import gc 
 
 
 def evaluation(model, dataLoader, args, device):
@@ -49,6 +50,16 @@ def evaluation(model, dataLoader, args, device):
         Recall.append(recall)
         NDCG.append(calNDCG(targetList, predIdxArray, k))
         PHR.append(calPHR(targetList, predIdxArray, k))
+    
+    del val
+    del idxList
+    del score
+    del targetList
+    del predIdx
+    del predIdxArray
+    torch.cuda.empty_cache()
+    
+    
 
     return Recall, NDCG, PHR
 

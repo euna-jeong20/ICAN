@@ -6,6 +6,7 @@ import numpy as np
 import scipy.sparse as sp
 import random
 import pdb
+import gc
 
 
 
@@ -19,27 +20,27 @@ class HGNN_conv4(nn.Module):
 
         self.device = device
         
-        self.weight_dict = self._init_weights()
+        # self.weight_dict = self._init_weights()
         # self.activation = nn.PReLU()
         # self.activation = nn.ELU()
         # self.activation = nn.Tanh()
         # self.activation = nn.ReLU()
         # self.activation = nn.LeakyReLU()
-        self.dropout = nn.Dropout(p = dropout_rate)
+        # self.dropout = nn.Dropout(p = dropout_rate)
 
-    def _init_weights(self):
-        print("Initializing weights...")
-        weight_dict = nn.ParameterDict()
+    # def _init_weights(self):
+    #     print("Initializing weights...")
+    #     weight_dict = nn.ParameterDict()
 
-        initializer = nn.init.xavier_uniform_
+    #     initializer = nn.init.xavier_uniform_
         
-        i = 0
-        weight_dict['%d' %i] = nn.Parameter(initializer(torch.empty(self.input_dim, self.output_dim).to(self.device)))
+    #     i = 0
+    #     weight_dict['%d' %i] = nn.Parameter(initializer(torch.empty(self.input_dim, self.output_dim).to(self.device)))
         
-        for i in range(1, self.num_layer + 1):
-            weight_dict['%d' %i] = nn.Parameter(initializer(torch.empty(self.output_dim, self.output_dim).to(self.device)))
+    #     for i in range(1, self.num_layer + 1):
+    #         weight_dict['%d' %i] = nn.Parameter(initializer(torch.empty(self.output_dim, self.output_dim).to(self.device)))
             
-        return weight_dict
+    #     return weight_dict
     
     def forward(self, input, coef_item_rep, coef_basket_rep):
         '''
@@ -71,6 +72,10 @@ class HGNN_conv4(nn.Module):
         final_item_rep.to(self.device)
         final_basket_rep.to(self.device)
 
+        del x
+        del basket_rep
+        del item_rep
+
         return final_item_rep, final_basket_rep
     
 
@@ -94,8 +99,8 @@ class Mymodel(nn.Module):
 
         self.user_emb = torch.empty(self.num_user, self.emb_dim).to(self.device)
         self.item_emb = nn.Embedding(self.num_item + 1, self.emb_dim, padding_idx= args.pad_id).to(self.device)
-        self.final_user_emb = nn.Parameter(initializer(torch.empty(self.num_user, self.emb_dim).to(self.device)))
-        self.g_user_emb = nn.Parameter(initializer(torch.empty(self.num_user, self.emb_dim).to(self.device)))
+        # self.final_user_emb = nn.Parameter(initializer(torch.empty(self.num_user, self.emb_dim).to(self.device)))
+        # self.g_user_emb = nn.Parameter(initializer(torch.empty(self.num_user, self.emb_dim).to(self.device)))
 
     def forward(self, log_seqs, batch_user_list, batch_len, repeatList):
         
@@ -198,7 +203,7 @@ class Mymodel(nn.Module):
 
         # 그냥 대입
         self.user_emb[batch_user_list] = user_rep
-        self.final_item_emb = nn.Parameter(item_rep)
+        self.final_item_emb= nn.Parameter(item_rep)
 
 
         ###이제 loss계산
@@ -210,7 +215,7 @@ class Mymodel(nn.Module):
         y_uj = torch.matmul(user_rep_for_loss, neg_bsk.t()).diag()
 
         result = torch.sigmoid(y_ui - y_uj)
-        result = torch.where(result == 0.0000e+00, epsilon, result)
+        # result = torch.where(result == 0.0000e+00, epsilon, result)
         result = -torch.mean(torch.log(result))
         loss_1 += result 
 
@@ -271,21 +276,58 @@ class Mymodel(nn.Module):
 
         loss_2 = loss_2 / len(log_seqs)
         # loss_3 = loss_3 / len(log_seqs)
-        l2norm = torch.sum(self.item_emb.weight**2) /2
-        l2reg = 1e-4 * l2norm
+        #l2norm = torch.sum(self.item_emb.weight**2) /2
+        #l2reg = 1e-4 * l2norm
+
+        del num_edge_list
+        del num_item_in_bas1D
+        del row
+        del col
+        del data
+        del zero
+        del H
+        del DD
+        del BD
+        del item_rep
+        del basket_rep
+        del bsk_user
+        del user_rep
+        del user_rep_for_loss
+
+        del all_idx
+        del prev_idx
+        del pos_bsk
+        del neg_bsk
+        
+        del y_ui
+        del y_uj
+        del all_item
+        del previous_item
+        del pos_item_list
+        del neg_item_list
+        del pos_item_rep
+        del neg_item_rep
+        del log_seqs
+
+        del result
+        
+        
 
 
         
-        return loss_1, loss_2, l2reg        
+        return loss_1, loss_2, 0       
 
 
     def predict(self, user):
         user_emb = self.user_emb[user]
         item_emb = self.final_item_emb[:-1]
 
-        g_user_emb = self.g_user_emb[user]
+        # g_user_emb = self.g_user_emb[user]
         score = torch.matmul(user_emb, item_emb.t())
         # score = torch.matmul(user_emb, item_emb.t()) + torch.matmul(g_user_emb, item_emb.t())
+
+        del user_emb
+        del item_emb
 
         return score
 
@@ -315,6 +357,16 @@ def generate_G_from_H(H):
 
     # invDE_HT_DV2 = invDE2 * HT            #엣지 업데이트할때 필요
     # G = DV2 * H      #노드 업데이트할때 필요
+
+    del W
+    del DV
+    del DE
+    del invDE2
+    del DV2
+    del HT
+    
+    
+
     return G, invDE_HT_DV2
 
 
@@ -330,4 +382,11 @@ def convert_sp_mat_to_sp_tensor(X):
     i = torch.LongTensor(np.mat([coo.row, coo.col]))
     v = torch.FloatTensor(coo.data)
     res = torch.sparse.FloatTensor(i, v, coo.shape)
+
+    del coo
+    del i
+    del v
+    
+    
+
     return res

@@ -16,7 +16,7 @@ class DataLoader():
 
         user2item = self.generate_user_list(datadict)
 
-        numRemove, user2idx = self.generate_sets(user2item)
+        numRemove = self.generate_sets(user2item)
         self.numItems = self.get_num_items() + 1
 
         print("num_users_removed   %d" % numRemove)
@@ -28,18 +28,21 @@ class DataLoader():
             self.testList), len(self.testList)      # 다 똑같은 유저 개수
         self.numItemsTrain, self.numItemsTest = self.numItems, self.numItems
         
-        self.valid2train = {}
-        self.test2trainVal = {}
-        for i in range(len(self.trainList)):
-            self.valid2train[i] = i
-            self.test2trainVal[i] = i
+        # self.valid2train = {}
+        # self.test2trainVal = {}
+        # for i in range(len(self.trainList)):
+        #     self.valid2train[i] = i
+        #     self.test2trainVal[i] = i
 
         if args.isTrain:
             self.lenTrain = self.generateLens(self.trainList)
             # self.lenVal = self.generateLens(self.validList)
         else:  # Test
             self.lenTrainVal = self.generateLens(self.trainValList)
-            # self.lenTest = self.generateLens(self.allList)        
+            # self.lenTest = self.generateLens(self.allList)
+
+        del user2item
+        torch.cuda.empty_cache()         
 
 
     def generate_user_list(self, dataDict):
@@ -47,9 +50,13 @@ class DataLoader():
         user2item = {}
         for user in all_users:
             user2item[user] = dataDict.get(user, [])        # user라는 key가 없으면 []를 return한다.
+        
+        del all_users
+
         return user2item
 
     def generate_sets(self, user2item):
+        max_seq_len = 50
         self.trainList = []
         self.validList = []
         self.trainValList = []
@@ -57,14 +64,17 @@ class DataLoader():
         self.allList = []
         count = 0
         count_remove = 0
-        user2idx = {}
+        # user2idx = {}
 
         for user in user2item:
             if len(user2item[user]) <= 5:  # train>=3, valid=1, test=1
                 count_remove += 1
                 continue
-            user2idx[user] = count
+            # user2idx[user] = count
             count += 1
+
+            if len(user2item[user]) > max_seq_len:
+                user2item[user] = user2item[user][-max_seq_len:]
             # 원본
             # self.trainList.append(user2item[user][:-2])
             # self.validList.append(user2item[user][:-1])
@@ -75,7 +85,8 @@ class DataLoader():
             self.trainValList.append(user2item[user][:-1])
             self.testList.append(user2item[user][-1])
             self.allList.append(user2item[user])
-        return count_remove, user2idx
+        # return count_remove, user2idx
+        return count_remove
 
     def get_num_items(self):
         numItem = 0
@@ -98,7 +109,11 @@ class DataLoader():
             for bas in user:
                 lenUser.append(len(bas))
             lens.append(lenUser)
+        
         # lens의 형태 [[3, 5, 1, 2, 6, 2, 4, 10, 3, ...], [18, 1, 2, 10, 13, 16, 3, 18, 1, ...], [4, 2, 2, 3, 6, 3, 3],...]
+        
+        del lenUser
+
         return lens
     
 
