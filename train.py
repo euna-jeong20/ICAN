@@ -33,6 +33,7 @@ def trainer(dataloader, args):
     
     idxList = [i for i in range(numUsers)]
     model = Mymodel(numUsers, numItems, args, device)
+    # model = torch.load('model.pth')
 
     model.train()
 
@@ -103,4 +104,4 @@ def trainer(dataloader, args):
         metric = ndcg[1] + recall[1] + phr[1]
         if best < metric:
             best = metric
-            torch.save(model, 'model.pth')
+            torch.save(model, f'model_{epoch}_{metric}.pth')

@@ -34,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--isTrain', default=1, type=int)
     parser.add_argument('--max_seq_len', default=50, type=int)
-    parser.add_argument('--max_subseq_len', default=3, type=int)
+    parser.add_argument('--max_subseq_len', default=2, type=int)
     
     args = parser.parse_args()
     seed_everything(args.seed)

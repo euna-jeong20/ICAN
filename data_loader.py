@@ -67,7 +67,7 @@ class DataLoader():
         # user2idx = {}
 
         for user in user2item:
-            if len(user2item[user]) <= 5:  # train>=3, valid=1, test=1
+            if len(user2item[user]) <= 4:  # train>=3, valid=1, test=1
                 count_remove += 1
                 continue
             # user2idx[user] = count
