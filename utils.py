@@ -12,7 +12,6 @@ def seed_everything(seed):
 
 
 def get_batch(dataLoader, args, batch_id, subseq_cnt):
-    
     samples, sampleLen, val = dataLoader.batchLoader(batch_id, args.isTrain)
     # subseq_idx = subseq_cnt + args.max_subseq_len
 
@@ -88,3 +87,70 @@ def get_batch(dataLoader, args, batch_id, subseq_cnt):
     
     # pad_batch.shape == [배치크기, max_seq, max_bsk]
     return np.array(paddedSamples), batch_len, batch_id, val, repeatList
+    
+    # samples, sampleLen, val = dataLoader.batchLoader(batch_id, args.isTrain)
+    # # subseq_idx = subseq_cnt + args.max_subseq_len
+
+    # subseq_idx = subseq_cnt + args.max_subseq_len
+    # maxLenSeq = max([len(userLen[0:subseq_idx]) for userLen in sampleLen])
+    # maxLenBas = max([max(userLen[0:subseq_idx]) for userLen in sampleLen])
+
+    # '''
+    # len(userLen)으로 유저의 seq 길이를 재고(몇개의 바구니를 소비했냐) 그걸 list로 만들어서 max를 해서 제일 긴 seq의 길이를 저장
+    # max(userLen)으로 유저마다 제일 긴 바구니안 아이템 개수를 list로 만들어서 max를 해서 제일 큰 바구니의 크기를 저장
+    # '''
+    # paddedSamples = []
+    # repeatList = []
+    # lenList = []
+    # check = 0
+    # remove_user = []
+
+    # batch_len = [user_len[0: subseq_idx] for user_len in sampleLen]
+
+    # for user_idx, user in enumerate(samples):
+    #     paddedU = []
+
+    #     # if len(batch_len[user_idx]) < max_seq:
+    #     #     remove_user.append(user_idx)
+    #     #     continue
+
+         
+    #     # flattenedList = sum(user, [])
+    #     # counts = Counter(flattenedList)
+    #     # repeat_item = [num for num, count in counts.items() if count >= 2]
+    #     # if len(repeat_item) < 1:
+    #     #     repeatList.append(user[-1])
+    #     # else:
+    #     #     repeatList.append(repeat_item)
+
+    #     user = user[0: subseq_idx]
+        
+    #     for eachBas in user:
+            
+    #         paddedBas = eachBas + [args.pad_id] * (maxLenBas - len(eachBas))
+    #         paddedBas = np.array(paddedBas)
+    #         paddedU.append(paddedBas)  # [batch, maxLenBas]
+
+    #     paddedU = paddedU + [[args.pad_id] * maxLenBas] * (maxLenSeq - len(paddedU))
+    #     paddedU = np.array(paddedU)
+        
+
+    #     if paddedU.shape != (maxLenSeq, maxLenBas):
+    #         print('error')
+    #     paddedSamples.append(paddedU)  # [batch, maxLenSeq]
+
+    # if len(remove_user) > 0:
+    #     batch_len = [batch_len[i] for i in range(len(batch_len)) if i not in remove_user]
+    #     batch_id = [batch_id[i] for i in range(len(batch_id)) if i not in remove_user]
+
+    # # del max_bsk_list
+    # # del samples
+    # # del sampleLen
+    # # del user
+    # # del paddedU
+    # # del remove_user
+    # torch.cuda.empty_cache() 
+
+    
+    # # pad_batch.shape == [배치크기, max_seq, max_bsk]
+    # return np.array(paddedSamples), batch_len, batch_id, val, repeatList

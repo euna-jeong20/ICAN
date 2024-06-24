@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 
 import numpy as np
 from collections import defaultdict
+from collections import Counter
 import random
 import pickle
 
@@ -22,6 +23,32 @@ class DataLoader():
         print("num_users_removed   %d" % numRemove)
         print("num_valid_users   %d" % len(self.allList))
         print("num_items   %d" % self.numItems)
+
+        # 아이템 id인 key와 같은 바구니에 n번 이상 등장한 아이템 id를 value list에 담음
+        n = args.n_times
+        self.co_purchase = defaultdict(list)
+        for item_id in range(self.numItems):
+            for user in datadict.keys():
+                user_bsk_seq = datadict[user]
+                for i in range(len(user_bsk_seq)-1):
+                    if item_id in user_bsk_seq[i]:
+                        self.co_purchase[item_id].append(user_bsk_seq[i])
+
+            flattened_list = sum(self.co_purchase[item_id], [])
+            #print(flattened_list)
+            counter = Counter(flattened_list)
+            new_val = [value for value, count in counter.items() if count >= n]
+            self.co_purchase[item_id] = new_val
+
+        a = sum(sum(self.allList, []), [])
+        counter = Counter(a)
+
+        # 결과를 텍스트 파일에 저장
+        with open('counter_results.txt', 'w') as f:
+            for element, count in counter.items():
+                f.write(f"Element {element}: {count} times\n")
+
+        print("Counter results saved to counter_results.txt")
 
 
         self.numTrain, self.numValid, self.numTrainVal, self.numTest = len(self.testList), len(self.testList), len(
@@ -67,14 +94,14 @@ class DataLoader():
         # user2idx = {}
 
         for user in user2item:
-            if len(user2item[user]) <= 4:  # train>=3, valid=1, test=1
+            if len(user2item[user]) <= 3:  # train>=3, valid=1, test=1
                 count_remove += 1
                 continue
             # user2idx[user] = count
             count += 1
 
-            if len(user2item[user]) > max_seq_len:
-                user2item[user] = user2item[user][-max_seq_len:]
+            # if len(user2item[user]) > max_seq_len:
+            #     user2item[user] = user2item[user][-max_seq_len:]
             # 원본
             # self.trainList.append(user2item[user][:-2])
             # self.validList.append(user2item[user][:-1])

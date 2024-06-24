@@ -42,7 +42,7 @@ class HGNN_conv4(nn.Module):
             
     #     return weight_dict
     
-    def forward(self, input, coef_item_rep, coef_basket_rep):
+    def forward(self, input, coef_item_rep, coef_basket_rep, isBsk):
         '''
         input: item emb
         '''
@@ -50,18 +50,79 @@ class HGNN_conv4(nn.Module):
         x = input
         final_item_rep = []
         final_basket_rep = []
-        
-        final_item_rep.append(x.data)
-        for i in range(self.num_layer):
-            x = torch.sparse.mm(coef_basket_rep, x)
+        if isBsk:
+            final_item_rep.append(x.data)
+            for i in range(self.num_layer):
+                x = torch.sparse.mm(coef_basket_rep, x)
 
-            basket_rep = x
+                basket_rep = x
+                final_basket_rep.append(basket_rep)
+                
+                item_rep = torch.sparse.mm(coef_item_rep, basket_rep)
+                final_item_rep.append(item_rep)
+
+                x = item_rep
+            
+            final_basket_rep = torch.stack(final_basket_rep)
+            final_item_rep = torch.stack(final_item_rep)
+            
+            final_basket_rep  = torch.mean(final_basket_rep, dim=0)
+            final_item_rep = torch.mean(final_item_rep, dim=0)
+
+            final_item_rep.to(self.device)
+            final_basket_rep.to(self.device)
+        else:
+            final_item_rep.append(x.data)
+            for i in range(self.num_layer):
+                x = torch.sparse.mm(coef_basket_rep, x)
+
+                basket_rep = x
+                final_basket_rep.append(basket_rep)
+                
+                item_rep = torch.sparse.mm(coef_item_rep, basket_rep)
+                final_item_rep.append(item_rep)
+
+                x = item_rep
+            
+            final_basket_rep = torch.stack(final_basket_rep)
+            final_item_rep = torch.stack(final_item_rep)
+            
+            final_basket_rep  = torch.mean(final_basket_rep, dim=0)
+            final_item_rep = torch.mean(final_item_rep, dim=0)
+
+            final_item_rep.to(self.device)
+            final_basket_rep.to(self.device)
+
+        del x
+        del basket_rep
+        del item_rep
+
+        return final_item_rep, final_basket_rep
+    
+class Lightgcn(nn.Module):
+    def __init__(self, input_dim, output_dim, num_layer, device, dropout_rate):
+        super(Lightgcn, self).__init__()
+
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.num_layer = num_layer
+
+        self.device = device
+
+    def forward(self, node_emb, edge_emb, coef_item_rep, coef_basket_rep):
+        
+        final_item_rep = []
+        final_basket_rep = []
+
+        final_item_rep.append(node_emb.data)
+        final_basket_rep.append(edge_emb.data)
+        for i in range(self.num_layer):
+            basket_rep = torch.sparse.mm(coef_basket_rep, node_emb)
             final_basket_rep.append(basket_rep)
             
-            item_rep = torch.sparse.mm(coef_item_rep, basket_rep)
+            item_rep = torch.sparse.mm(coef_item_rep, edge_emb)
             final_item_rep.append(item_rep)
 
-            x = item_rep
         
         final_basket_rep = torch.stack(final_basket_rep)
         final_item_rep = torch.stack(final_item_rep)
@@ -72,12 +133,7 @@ class HGNN_conv4(nn.Module):
         final_item_rep.to(self.device)
         final_basket_rep.to(self.device)
 
-        del x
-        del basket_rep
-        del item_rep
-
         return final_item_rep, final_basket_rep
-    
 
 class Mymodel(nn.Module):
     def __init__(self, num_user, num_item, args, device):
@@ -95,14 +151,15 @@ class Mymodel(nn.Module):
         
         initializer = nn.init.xavier_uniform_
 
-        self.conv = HGNN_conv4(self.emb_dim, self.emb_dim, self.num_layer, self.device, self.dropout_rate)
-
+        # self.conv = HGNN_conv4(self.emb_dim, self.emb_dim, self.num_layer, self.device, self.dropout_rate)
+        self.conv = Lightgcn(self.emb_dim, self.emb_dim, self.num_layer, self.device, self.dropout_rate)
         self.user_emb = torch.empty(self.num_user, self.emb_dim).to(self.device)
         self.item_emb = nn.Embedding(self.num_item + 1, self.emb_dim, padding_idx= args.pad_id).to(self.device)
+        self.edge_emb = nn.Embedding(512, self.emb_dim).to(self.device)     #retailrocket 3
         # self.final_user_emb = nn.Parameter(initializer(torch.empty(self.num_user, self.emb_dim).to(self.device)))
         # self.g_user_emb = nn.Parameter(initializer(torch.empty(self.num_user, self.emb_dim).to(self.device)))
 
-    def forward(self, log_seqs, batch_user_list, batch_len, repeatList):
+    def forward(self, log_seqs, batch_user_list, batch_len, repeatList, co_item):
         
         '''
         log_seqs [배치크기, max_seq, max_bsk]
@@ -138,15 +195,22 @@ class Mymodel(nn.Module):
         zero = np.zeros(H.shape[1])
         zero = sp.coo_matrix(zero)
         H = sp.vstack([H, zero])
+        # H = sp.hstack([H, co_item])
 
         # H로 부터 D^-1/2~~랑 B^-1/2 만들기 (계수)
         DD, BD = generate_G_from_H(H)
         DD = convert_sp_mat_to_sp_tensor(DD).to(self.device)
         BD = convert_sp_mat_to_sp_tensor(BD).to(self.device)
 
-        # conv계산해서 item_rep와 basket_rep얻기
-        item_rep, basket_rep = self.conv(self.item_emb.weight, DD, BD)
 
+        
+        # conv계산해서 item_rep와 basket_rep얻기
+        # 
+        item_rep, basket_rep = self.conv(self.item_emb.weight, self.edge_emb.weight, DD, BD)
+        # i_DD, i_BD = co_item
+        # co_item_rep, _ = self.conv(self.item_emb.weight, i_DD, i_BD, False)
+        
+        # item_rep = (item_rep + 0.1*co_item_rep) 
         #basket_rep에 미리 유저별로 알맞게 time_decay를 곱해 놓는거
         # start = 0
         # for cnt in num_edge_list:
@@ -201,9 +265,7 @@ class Mymodel(nn.Module):
 
 
 
-        # 그냥 대입
-        self.user_emb[batch_user_list] = user_rep
-        self.final_item_emb= nn.Parameter(item_rep)
+
 
 
         ###이제 loss계산
@@ -230,7 +292,7 @@ class Mymodel(nn.Module):
             userbsk_num = len(userbsk_len)
             
             previous_item = set(np.unique(log_seqs[user_idx][:userbsk_num]))
-            
+            # co_occur_item
             pos_item_list = log_seqs[user_idx][userbsk_num-1]
             pos_item_list = pos_item_list[pos_item_list != self.pad_id]
             neg_item_list = random.sample(list(all_item - previous_item), len(pos_item_list))
@@ -243,7 +305,7 @@ class Mymodel(nn.Module):
 
 
             result = torch.sigmoid(y_ui - y_uj)
-            result = torch.where(result == 0.0000, epsilon, result)
+            # result = torch.where(result == 0.0000, epsilon, result)
             result = -torch.mean(torch.log(result))
             loss_2 += result
             
@@ -276,8 +338,12 @@ class Mymodel(nn.Module):
 
         loss_2 = loss_2 / len(log_seqs)
         # loss_3 = loss_3 / len(log_seqs)
-        #l2norm = torch.sum(self.item_emb.weight**2) /2
-        #l2reg = 1e-4 * l2norm
+        l2norm = torch.sum(item_rep**2) /2
+        l2reg = 1e-5 * l2norm
+
+        # 그냥 대입
+        self.user_emb[batch_user_list] = user_rep
+        self.final_item_emb= nn.Parameter(item_rep)
 
         del num_edge_list
         del num_item_in_bas1D
@@ -315,7 +381,7 @@ class Mymodel(nn.Module):
 
 
         
-        return loss_1, loss_2, 0       
+        return loss_1, loss_2, l2reg       
 
 
     def predict(self, user):
