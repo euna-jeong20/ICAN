@@ -97,12 +97,6 @@ def trainer(dataloader, args):
                 loss3_val += loss3.item()
 
                 i += 1
-                del log_seqs
-                del batch_len
-                del batch_id
-                del loss1
-                del loss2
-                del loss
                 torch.cuda.empty_cache()
                            
 
@@ -168,13 +162,6 @@ def generate_G_from_H(H):
 
     # invDE_HT_DV2 = invDE2 * HT            #엣지 업데이트할때 필요
     # G = DV2 * H      #노드 업데이트할때 필요
-
-    del W
-    del DV
-    del DE
-    del invDE2
-    del DV2
-    del HT
     
     
 
@@ -194,10 +181,6 @@ def convert_sp_mat_to_sp_tensor(X):
     v = torch.FloatTensor(coo.data)
     res = torch.sparse.FloatTensor(i, v, coo.shape)
 
-    del coo
-    del i
-    del v
-    
     
 
     return res
